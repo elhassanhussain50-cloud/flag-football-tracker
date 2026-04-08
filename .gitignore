@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.venv/
+venv/
+
+# Data / model weights
+data/videos/
+data/outputs/
+*.pt
+*.npy
+*.db
+
+# OS
+.DS_Store
