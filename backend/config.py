@@ -22,7 +22,7 @@ NO_RUNNING_ZONE_YARDS: int      = 5    # 5 yd from each goal line into playing f
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-PROJECT_ROOT   = Path(__file__).parent
+PROJECT_ROOT   = Path(__file__).parent.parent   # repo root (one level above backend/)
 DATA_DIR       = PROJECT_ROOT / "data"
 VIDEOS_DIR     = DATA_DIR / "videos"
 OUTPUTS_DIR    = DATA_DIR / "outputs"

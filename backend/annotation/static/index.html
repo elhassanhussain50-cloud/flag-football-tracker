@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flag Football Annotator</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #111; color: #eee; font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Header ── */
+header { background: #1a1a1a; border-bottom: 1px solid #2a2a2a; padding: 8px 16px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+header h1 { font-size: .9rem; font-weight: 600; }
+#frame-counter { font-size: .8rem; color: #888; }
+#state-banner { margin-left: auto; font-size: .8rem; font-weight: 600; padding: 4px 12px; border-radius: 12px; display: none; }
+#state-banner.pass-open  { display: inline-block; background: #1a3a5c; color: #4a9eff; }
+#state-banner.player-sel { display: inline-block; background: #2a2a1a; color: #ffd740; }
+
+/* ── Main layout ── */
+.main { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+/* ── Centre: video ── */
+.centre { flex: 1; display: flex; flex-direction: column; padding: 8px; gap: 8px; min-width: 0; min-height: 0; }
+
+/* Video wrap */
+.video-wrap { position: relative; flex: 1; background: #000; border-radius: 6px; min-height: 0; overflow: hidden; }
+#vid { width: 100%; height: 100%; object-fit: contain; display: block; }
+#overlay { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 2; }
+
+/* Jersey popup */
+#jersey-popup { position: absolute; background: #222; border: 1px solid #555; border-radius: 6px; padding: 8px 10px; display: none; z-index: 10; min-width: 160px; }
+#jersey-popup label { font-size: .7rem; color: #aaa; display: block; margin-bottom: 4px; }
+#jersey-input { width: 100%; background: #111; border: 1px solid #555; color: #fff; padding: 5px 8px; border-radius: 4px; font-size: .85rem; }
+#jersey-popup .popup-btns { display: flex; gap: 6px; margin-top: 6px; }
+#jersey-popup button { flex: 1; padding: 4px; border: none; border-radius: 4px; cursor: pointer; font-size: .75rem; }
+.btn-save-jersey { background: #4a9eff; color: #fff; }
+.btn-skip-jersey { background: #333; color: #aaa; }
+
+/* Timeline */
+#timeline-wrap { height: 32px; flex-shrink: 0; }
+#timeline { width: 100%; height: 32px; display: block; cursor: pointer; border-radius: 4px; }
+
+/* Hotkeys */
+.hotkeys { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
+.hk { padding: 5px 12px; border-radius: 16px; border: 1.5px solid; background: transparent; cursor: pointer; font-size: .75rem; font-weight: 600; transition: opacity .15s; }
+.hk:active { opacity: .6; }
+.hk[data-type="PASS"]      { border-color:#4a9eff; color:#4a9eff; }
+.hk[data-type="FLAG_PULL"] { border-color:#ff5252; color:#ff5252; }
+.hk[data-type="TOUCHDOWN"] { border-color:#4caf50; color:#4caf50; }
+.hk[data-type="INCOMPLETE"]{ border-color:#888;    color:#888;    }
+.hk[data-type="ROUTE"]     { border-color:#ff9800; color:#ff9800; }
+.hk[data-type="CATCH"]     { border-color:#b39ddb; color:#b39ddb; }
+.hk.dim { opacity: .3; pointer-events: none; }
+
+/* ── Right sidebar ── */
+.right { width: 250px; background: #161616; border-left: 1px solid #2a2a2a; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.section-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: #666; padding: 8px 12px 6px; border-bottom: 1px solid #222; flex-shrink: 0; }
+#players-panel { max-height: 180px; overflow-y: auto; flex-shrink: 0; border-bottom: 1px solid #222; }
+.player-row { display: flex; align-items: center; gap: 8px; padding: 5px 12px; font-size: .75rem; cursor: pointer; }
+.player-row:hover { background: #1e1e1e; }
+.player-row.selected { background: #1a2a1a; }
+.p-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.p-jersey { font-weight: 700; min-width: 26px; }
+.p-name { color: #aaa; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#events-panel { flex: 1; overflow-y: auto; }
+.event-row { padding: 5px 12px; border-bottom: 1px solid #1e1e1e; font-size: .73rem; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.event-row:hover { background: #1e1e1e; }
+.ev-frame { color: #555; min-width: 38px; flex-shrink: 0; }
+.ev-badge { padding: 1px 5px; border-radius: 8px; font-size: .62rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.badge-PASS       { background:#1a3a5c; color:#4a9eff; }
+.badge-CATCH      { background:#1a2a3a; color:#80cbc4; }
+.badge-FLAG_PULL  { background:#3a1a1a; color:#ff5252; }
+.badge-TOUCHDOWN  { background:#1a3a1a; color:#4caf50; }
+.badge-INCOMPLETE { background:#2a2a2a; color:#888; }
+.badge-ROUTE      { background:#3a2a10; color:#ff9800; }
+.ev-players { flex: 1; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-del { background: none; border: none; color: #444; cursor: pointer; font-size: .9rem; flex-shrink: 0; }
+.ev-del:hover { color: #ff5252; }
+
+/* Flash */
+#flash { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 7px 16px; border-radius: 16px; font-size: .8rem; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 50; }
+#flash.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏈 Flag Football Annotator</h1>
+  <span id="frame-counter">Frame 0</span>
+  <span id="state-banner"></span>
+</header>
+
+<div class="main">
+  <div class="centre">
+      <!-- Video with dot overlay -->
+      <div class="video-wrap" id="video-wrap">
+        <video id="vid" src="/video" controls preload="metadata"></video>
+        <canvas id="overlay"></canvas>
+        <div id="jersey-popup">
+          <label id="jersey-label">Assign jersey #</label>
+          <input id="jersey-input" type="text" maxlength="3" placeholder="e.g. 8">
+          <div class="popup-btns">
+            <button class="btn-save-jersey" id="jersey-save">Assign</button>
+            <button class="btn-skip-jersey" id="jersey-skip">Skip</button>
+          </div>
+        </div>
+      </div>
+
+    <div id="timeline-wrap"><canvas id="timeline"></canvas></div>
+
+    <div class="hotkeys">
+      <button class="hk" data-type="PASS">P — Pass</button>
+      <button class="hk" data-type="CATCH">C — Catch</button>
+      <button class="hk" data-type="FLAG_PULL">F — Flag Pull</button>
+      <button class="hk" data-type="TOUCHDOWN">T — Touchdown</button>
+      <button class="hk" data-type="INCOMPLETE">I — Incomplete</button>
+      <button class="hk" data-type="ROUTE">R — Route</button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="section-title">Players</div>
+    <div id="players-panel"></div>
+    <div class="section-title">Events</div>
+    <div id="events-panel"></div>
+  </div>
+</div>
+
+<div id="flash"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────
+const STATE = { IDLE: 'idle', PLAYER_SEL: 'player_sel', PASS_OPEN: 'pass_open' };
+let state        = STATE.IDLE;
+let selectedDot  = null;
+let openPlay     = null;
+let dotCache     = [];
+let playerMap    = {};
+let events       = [];
+let FPS          = 25;
+let totalFrames  = 1;
+let lastFetchedFrame = -1;
+
+// ─────────────────────────────────────────────────────────────────
+// DOM
+// ─────────────────────────────────────────────────────────────────
+const vid          = document.getElementById('vid');
+const overlay      = document.getElementById('overlay');
+const oc           = overlay.getContext('2d');
+const tlCanvas     = document.getElementById('timeline');
+const tlCtx        = tlCanvas.getContext('2d');
+const frameCounter = document.getElementById('frame-counter');
+const stateBanner  = document.getElementById('state-banner');
+const jerseyPopup  = document.getElementById('jersey-popup');
+const jerseyInput  = document.getElementById('jersey-input');
+const jerseyLabel  = document.getElementById('jersey-label');
+const playersPanel = document.getElementById('players-panel');
+const eventsPanel  = document.getElementById('events-panel');
+const flash        = document.getElementById('flash');
+
+const TEAM_COLORS  = { A: '#4a9eff', B: '#ff5252', default: '#ffd740' };
+const EVENT_COLORS = { PASS:'#4a9eff', CATCH:'#80cbc4', FLAG_PULL:'#ff5252', TOUCHDOWN:'#4caf50', INCOMPLETE:'#555', ROUTE:'#ff9800' };
+
+function dotColor(dot) {
+  if (dot.team === 'A') return TEAM_COLORS.A;
+  if (dot.team === 'B') return TEAM_COLORS.B;
+  return TEAM_COLORS.default;
+}
+function uuid() {
+  return crypto.randomUUID ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+function mergePlayerInfo(dots) {
+  dots.forEach(d => {
+    const p = playerMap[d.tracking_id];
+    if (p) { d.jersey = p.jersey; d.name = p.name; d.team = p.team; }
+  });
+  return dots;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────────
+async function init() {
+  const info = await fetch('/info').then(r => r.json());
+  totalFrames = info.total_frames || 1;
+  await Promise.all([loadPlayers(), loadEvents()]);
+  syncCanvasSizes();
+  requestAnimationFrame(renderLoop);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Canvas sizing
+// ─────────────────────────────────────────────────────────────────
+function syncCanvasSizes() {
+  const vw = vid.offsetWidth, vh = vid.offsetHeight;
+  if (vw > 0 && vh > 0) {
+    overlay.width  = vw; overlay.height = vh;
+    overlay.style.width = vw + 'px'; overlay.style.height = vh + 'px';
+  }
+  const tw = document.getElementById('timeline-wrap').clientWidth;
+  if (tw > 0) { tlCanvas.width = tw; tlCanvas.height = 32; }
+}
+
+window.addEventListener('resize', syncCanvasSizes);
+vid.addEventListener('loadedmetadata', () => {
+  syncCanvasSizes();
+  if (vid.duration && totalFrames) FPS = totalFrames / vid.duration;
+});
+
+// ─────────────────────────────────────────────────────────────────
+// Render loop
+// ─────────────────────────────────────────────────────────────────
+function currentFrame() { return Math.round(vid.currentTime * FPS); }
+
+async function renderLoop() {
+  syncCanvasSizes();
+  const frame = currentFrame();
+  frameCounter.textContent = `Frame ${frame}`;
+
+  if (frame !== lastFetchedFrame) {
+    lastFetchedFrame = frame;
+    const dots = await fetch(`/tracking/frame/${frame}`).then(r => r.json()).catch(() => []);
+    dotCache = mergePlayerInfo(dots);
+  }
+
+  drawOverlay();
+  drawTimeline(frame);
+
+  requestAnimationFrame(renderLoop);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Video overlay
+// ─────────────────────────────────────────────────────────────────
+function getVideoRect() {
+  const eW = vid.offsetWidth, eH = vid.offsetHeight;
+  const vW = vid.videoWidth, vH = vid.videoHeight;
+  if (!vW || !vH) return { x: 0, y: 0, w: eW, h: eH };
+  const eA = eW / eH, vA = vW / vH;
+  let rW, rH, rX, rY;
+  if (vA > eA) { rW = eW; rH = eW / vA; rX = 0; rY = (eH - rH) / 2; }
+  else         { rH = eH; rW = eH * vA; rY = 0; rX = (eW - rW) / 2; }
+  return { x: rX, y: rY, w: rW, h: rH };
+}
+
+function drawOverlay() {
+  const W = overlay.width, H = overlay.height;
+  if (!W || !H || !vid.videoWidth || !vid.videoHeight) return;
+  oc.clearRect(0, 0, W, H);
+  const vr = getVideoRect();
+  const sx = vr.w / vid.videoWidth, sy = vr.h / vid.videoHeight;
+
+  dotCache.forEach(dot => {
+    const cx = vr.x + dot.x_pixel * sx;
+    const cy = vr.y + dot.y_pixel * sy;
+    const col = dotColor(dot);
+    const isSel = selectedDot && selectedDot.tracking_id === dot.tracking_id;
+
+    if (isSel) { oc.shadowColor = col; oc.shadowBlur = 14; }
+    oc.beginPath();
+    oc.arc(cx, cy, isSel ? 12 : 9, 0, Math.PI * 2);
+    oc.fillStyle = col; oc.globalAlpha = 0.88; oc.fill();
+    oc.globalAlpha = 1; oc.shadowBlur = 0;
+
+    if (isSel) {
+      oc.beginPath(); oc.arc(cx, cy, 16, 0, Math.PI * 2);
+      oc.strokeStyle = '#fff'; oc.lineWidth = 2; oc.stroke();
+    }
+
+    const label = dot.jersey ? `#${dot.jersey}` : `${dot.tracking_id}`;
+    oc.font = `bold ${isSel ? 11 : 10}px sans-serif`;
+    oc.fillStyle = '#fff'; oc.textAlign = 'center'; oc.textBaseline = 'middle';
+    oc.fillText(label, cx, cy);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Timeline
+// ─────────────────────────────────────────────────────────────────
+function drawTimeline(frame) {
+  const W = tlCanvas.width, H = tlCanvas.height;
+  tlCtx.clearRect(0, 0, W, H);
+  tlCtx.fillStyle = '#2a2a2a';
+  tlCtx.beginPath(); tlCtx.roundRect(0, 10, W, 12, 3); tlCtx.fill();
+  events.forEach(ev => {
+    const ex = (ev.frame_no / totalFrames) * W;
+    tlCtx.fillStyle = EVENT_COLORS[ev.event_type] || '#fff';
+    tlCtx.beginPath(); tlCtx.roundRect(ex - 2, 6, 4, 20, 2); tlCtx.fill();
+  });
+  const px = ((frame || 0) / totalFrames) * W;
+  tlCtx.fillStyle = '#fff';
+  tlCtx.beginPath(); tlCtx.moveTo(px, 4); tlCtx.lineTo(px-4, 0); tlCtx.lineTo(px+4, 0); tlCtx.closePath(); tlCtx.fill();
+  tlCtx.fillRect(px - 1, 4, 2, 28);
+}
+tlCanvas.addEventListener('click', e => { vid.currentTime = (e.offsetX / tlCanvas.width) * vid.duration; });
+
+// ─────────────────────────────────────────────────────────────────
+// Video wrap click → select dot
+// ─────────────────────────────────────────────────────────────────
+document.getElementById('video-wrap').addEventListener('click', e => {
+  if (jerseyPopup.style.display === 'block') return;
+  if (!vid.videoWidth || !vid.videoHeight) return;
+
+  const rect = overlay.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const vr = getVideoRect();
+  const sx = vr.w / vid.videoWidth, sy = vr.h / vid.videoHeight;
+
+  let closest = null, minDist = 25;
+  dotCache.forEach(dot => {
+    const cx = vr.x + dot.x_pixel * sx, cy = vr.y + dot.y_pixel * sy;
+    const d = Math.hypot(mx - cx, my - cy);
+    if (d < minDist) { minDist = d; closest = dot; }
+  });
+
+  if (!closest) { deselect(); return; }
+  selectedDot = { ...closest };
+  setState(STATE.PLAYER_SEL);
+
+  if (!closest.jersey) {
+    showJerseyPopup(vr.x + closest.x_pixel * sx, vr.y + closest.y_pixel * sy, closest);
+  } else {
+    flash_(`Selected #${closest.jersey}`);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// Jersey popup
+// ─────────────────────────────────────────────────────────────────
+function showJerseyPopup(x, y, dot) {
+  jerseyLabel.textContent = `Assign jersey for dot ${dot.tracking_id}`;
+  jerseyInput.value = '';
+  jerseyPopup.style.display = 'block';
+  jerseyPopup.style.left = `${Math.min(x, overlay.clientWidth - 180)}px`;
+  jerseyPopup.style.top  = `${Math.min(y + 14, overlay.clientHeight - 90)}px`;
+  jerseyInput.focus();
+  jerseyPopup._dot = dot;
+}
+function hideJerseyPopup() { jerseyPopup.style.display = 'none'; }
+
+document.getElementById('jersey-save').addEventListener('click', saveJersey);
+document.getElementById('jersey-skip').addEventListener('click', hideJerseyPopup);
+jerseyInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter')  saveJersey();
+  if (e.key === 'Escape') hideJerseyPopup();
+  e.stopPropagation();
+});
+
+async function saveJersey() {
+  const dot = jerseyPopup._dot, jersey = jerseyInput.value.trim();
+  hideJerseyPopup();
+  if (!jersey || !dot) return;
+  await fetch('/players', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ tracking_id: dot.tracking_id, jersey }) });
+  await loadPlayers();
+  if (selectedDot && selectedDot.tracking_id === dot.tracking_id) selectedDot.jersey = jersey;
+  flash_(`#${jersey} assigned`);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────
+function setState(s) {
+  state = s;
+  stateBanner.className = '';
+  stateBanner.textContent = '';
+  if (s === STATE.PLAYER_SEL && selectedDot) {
+    const lbl = selectedDot.jersey ? `#${selectedDot.jersey}` : `dot ${selectedDot.tracking_id}`;
+    stateBanner.textContent = `${lbl} selected — press hotkey`;
+    stateBanner.classList.add('player-sel');
+  } else if (s === STATE.PASS_OPEN && openPlay) {
+    stateBanner.textContent = `PASS open — #${openPlay.passer_jersey || '?'} throwing · select receiver → C or I`;
+    stateBanner.classList.add('pass-open');
+  }
+  updateHotkeyDim();
+}
+
+function deselect() {
+  if (state !== STATE.PASS_OPEN) { selectedDot = null; setState(STATE.IDLE); }
+}
+
+function updateHotkeyDim() {
+  document.querySelectorAll('.hk').forEach(btn => {
+    const t = btn.dataset.type;
+    const dim = state === STATE.IDLE ? t === 'CATCH'
+              : state === STATE.PASS_OPEN ? !['CATCH','INCOMPLETE'].includes(t) : false;
+    btn.classList.toggle('dim', dim);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Hotkeys
+// ─────────────────────────────────────────────────────────────────
+const HOTKEYS = { p:'PASS', c:'CATCH', f:'FLAG_PULL', t:'TOUCHDOWN', i:'INCOMPLETE', r:'ROUTE' };
+
+document.addEventListener('keydown', e => {
+  if (jerseyPopup.style.display === 'block') return;
+  if (e.key === 'Escape') { cancelOpenPlay(); return; }
+  const type = HOTKEYS[e.key.toLowerCase()];
+  if (type) tagEvent(type);
+});
+document.querySelectorAll('.hk').forEach(btn => btn.addEventListener('click', () => tagEvent(btn.dataset.type)));
+
+async function tagEvent(type) {
+  const frame = currentFrame();
+  if ((type === 'CATCH' || type === 'INCOMPLETE') && state === STATE.PASS_OPEN) {
+    await postEvent({ frame_no:frame, event_type:type, tracking_id:selectedDot?.tracking_id||null, jersey:selectedDot?.jersey||null, play_id:openPlay.play_id });
+    openPlay = null; selectedDot = null; setState(STATE.IDLE);
+    await loadEvents(); flash_(`${type} — play closed`);
+    return;
+  }
+  if (!selectedDot) { flash_('Click a player dot first'); return; }
+  const { tracking_id: tid, jersey } = selectedDot;
+  if (type === 'PASS') {
+    const play_id = uuid();
+    await postEvent({ frame_no:frame, event_type:'PASS', tracking_id:tid, jersey, play_id });
+    openPlay = { play_id, passer_jersey:jersey, frame_no:frame };
+    selectedDot = null; setState(STATE.PASS_OPEN);
+    await loadEvents(); flash_(`PASS by #${jersey||tid} — select receiver`);
+    return;
+  }
+  await postEvent({ frame_no:frame, event_type:type, tracking_id:tid, jersey });
+  selectedDot = null; setState(STATE.IDLE);
+  await loadEvents(); flash_(`${type} — #${jersey||tid} @ f.${frame}`);
+}
+
+function cancelOpenPlay() {
+  if (state === STATE.PASS_OPEN) { openPlay = null; selectedDot = null; setState(STATE.IDLE); flash_('Play cancelled'); }
+  else deselect();
+}
+
+async function postEvent(data) {
+  return fetch('/events', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }).then(r=>r.json());
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Data loaders
+// ─────────────────────────────────────────────────────────────────
+async function loadPlayers() {
+  const list = await fetch('/players').then(r => r.json());
+  playerMap = {};
+  list.forEach(p => { playerMap[p.tracking_id] = p; });
+  renderPlayers(list);
+}
+async function loadEvents() {
+  events = await fetch('/events').then(r => r.json());
+  renderEvents();
+}
+
+function renderPlayers(list) {
+  if (!list.length) {
+    playersPanel.innerHTML = '<div style="padding:10px 12px;color:#555;font-size:.75rem">Click a dot to assign a jersey.</div>';
+    return;
+  }
+  playersPanel.innerHTML = list.map(p => {
+    const col  = p.team === 'A' ? TEAM_COLORS.A : p.team === 'B' ? TEAM_COLORS.B : TEAM_COLORS.default;
+    const isSel = selectedDot && selectedDot.tracking_id === p.tracking_id;
+    return `<div class="player-row${isSel?' selected':''}" data-tid="${p.tracking_id}">
+      <span class="p-dot" style="background:${col}"></span>
+      <span class="p-jersey">${p.jersey ? '#'+p.jersey : '—'}</span>
+      <span class="p-name">${p.name || `dot ${p.tracking_id}`}</span>
+    </div>`;
+  }).join('');
+  playersPanel.querySelectorAll('.player-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const tid = parseInt(row.dataset.tid);
+      const dot = dotCache.find(d => d.tracking_id === tid);
+      if (dot) { selectedDot = { ...dot, ...playerMap[tid] }; setState(STATE.PLAYER_SEL); }
+    });
+  });
+}
+
+function renderEvents() {
+  if (!events.length) {
+    eventsPanel.innerHTML = '<div style="padding:10px 12px;color:#555;font-size:.75rem">No events yet.</div>';
+    return;
+  }
+  const plays = {}, single = [];
+  events.forEach(ev => ev.play_id ? ((plays[ev.play_id] = plays[ev.play_id]||[]).push(ev)) : single.push(ev));
+  const rows = [];
+
+  Object.values(plays).forEach(group => {
+    const pass  = group.find(e => e.event_type === 'PASS');
+    const close = group.find(e => ['CATCH','INCOMPLETE'].includes(e.event_type));
+    const pLbl  = pass  ? (pass.jersey  ? `#${pass.jersey}`  : `d${pass.tracking_id}`)  : '?';
+    const cLbl  = close ? (close.jersey ? `#${close.jersey}` : `d${close.tracking_id}`) : '…';
+    const oc_   = close?.event_type === 'CATCH' ? '#80cbc4' : close ? '#888' : '#ffd740';
+    rows.push(`<div class="event-row" data-frame="${pass?.frame_no ?? group[0].frame_no}">
+      <span class="ev-frame">f.${pass?.frame_no ?? group[0].frame_no}</span>
+      <span class="ev-badge badge-PASS">PASS</span>
+      <span class="ev-players">${pLbl} → <span style="color:${oc_}">${cLbl}</span></span>
+      <button class="ev-del" data-ids="${group.map(e=>e.id).join(',')}">×</button></div>`);
+  });
+
+  single.forEach(ev => {
+    const pl = ev.jersey ? `#${ev.jersey}` : ev.tracking_id ? `d${ev.tracking_id}` : '';
+    rows.push(`<div class="event-row" data-frame="${ev.frame_no}">
+      <span class="ev-frame">f.${ev.frame_no}</span>
+      <span class="ev-badge badge-${ev.event_type}">${ev.event_type.replace('_',' ')}</span>
+      <span class="ev-players">${pl}</span>
+      <button class="ev-del" data-ids="${ev.id}">×</button></div>`);
+  });
+
+  eventsPanel.innerHTML = rows.join('');
+  eventsPanel.querySelectorAll('.ev-del').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      await Promise.all(btn.dataset.ids.split(',').map(id => fetch(`/events/${id}`,{method:'DELETE'})));
+      await loadEvents();
+    });
+  });
+  eventsPanel.querySelectorAll('.event-row').forEach(row => {
+    row.addEventListener('click', e => {
+      if (e.target.classList.contains('ev-del')) return;
+      vid.currentTime = parseInt(row.dataset.frame) / FPS;
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Flash
+// ─────────────────────────────────────────────────────────────────
+let _ft;
+function flash_(msg) {
+  flash.textContent = msg; flash.classList.add('show');
+  clearTimeout(_ft); _ft = setTimeout(() => flash.classList.remove('show'), 2200);
+}
+
+init();
+</script>
+</body>
+</html>

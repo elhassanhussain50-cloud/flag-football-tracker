@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* SnapTag color system */
+  --bg-base:       #0d0d0f;
+  --bg-raised:     #141418;
+  --bg-overlay:    #1c1c22;
+  --border:        #2a2a32;
+  --border-bright: #3d3d4a;
+
+  --text-primary:   #f0f0f4;
+  --text-secondary: #9898a8;
+  --text-muted:     #5a5a6a;
+
+  --accent:         #f5a623;   /* amber — scoreboard orange */
+  --accent-dim:     #b87318;
+  --accent-glow:    rgba(245, 166, 35, 0.15);
+
+  --team-a:  #f97316;   /* orange */
+  --team-b:  #06b6d4;   /* cyan */
+
+  --status-processing: #f5a623;
+  --status-ready:      #22c55e;
+  --status-error:      #ef4444;
+  --status-uploaded:   #3b82f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+/* Display font utility */
+.font-display {
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+.font-mono {
+  font-family: 'DM Mono', monospace;
+}
+
+/* Ambient glow for accent elements */
+.glow-amber {
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+/* Field grid pattern background */
+.field-grid {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+}

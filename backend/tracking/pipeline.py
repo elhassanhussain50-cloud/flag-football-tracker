@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 import cv2
 import numpy as np
@@ -20,7 +20,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import (
     DETECTION_CONF,
     DEFAULT_STRIDE,
+    FIELD_TOTAL_LENGTH_YARDS,
     PERSON_CLASS_ID,
+    PLAYING_FIELD_WIDTH_YARDS,
     TRACKER_CONFIG,
     YOLO_MODEL,
 )
@@ -37,7 +39,7 @@ def track(
     conf: float = DETECTION_CONF,
     model_name: str = YOLO_MODEL,
     tracker_config: str = TRACKER_CONFIG,
-    progress_cb: Callable[[int, int], None] | None = None,
+    progress_cb: Optional[Callable[[int, int], None]] = None,
 ) -> int:
     """
     Run detection + tracking on video_path, write rows to conn.
@@ -89,20 +91,24 @@ def track(
 
             # Bounding-box centres
             cx = ((xyxy[:, 0] + xyxy[:, 2]) / 2).reshape(-1, 1)
-            cy = ((xyxy[:, 1] + xyxy[:, 3]) / 2).reshape(-1, 1)
+            cy = xyxy[:, 3].reshape(-1, 1)   # bottom edge = feet on ground
             pixel_pts  = np.hstack([cx, cy]).astype(np.float32)
 
             yard_pts = pixels_to_yards_batch(H, pixel_pts)  # (N, 2)
 
             for i in range(len(track_ids)):
+                x_yd, y_yd = float(yard_pts[i, 0]), float(yard_pts[i, 1])
+                if not (0 <= x_yd <= FIELD_TOTAL_LENGTH_YARDS and
+                        0 <= y_yd <= PLAYING_FIELD_WIDTH_YARDS):
+                    continue  # outside field boundary — ref, coach, spectator
                 batch.append((
                     frame_no,
                     int(track_ids[i]),
                     float(cx[i, 0]),
                     float(cy[i, 0]),
                     float(confs[i]),
-                    float(yard_pts[i, 0]),
-                    float(yard_pts[i, 1]),
+                    x_yd,
+                    y_yd,
                 ))
 
             if len(batch) >= BATCH_SIZE:

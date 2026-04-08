@@ -16,6 +16,8 @@ Coordinate system:
     Y = yards along field width  (0 → 25).
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 
 import cv2
